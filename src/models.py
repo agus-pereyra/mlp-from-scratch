@@ -1,4 +1,6 @@
+import time
 import numpy as np
+from tqdm import tqdm
 from src.activations import ACTIVATIONS
 from src.utils import to_onehot
 from src.metrics import cross_entropy
@@ -9,16 +11,19 @@ class NN:
     - Capa de salida: Softmax
     - Función de pérdida: Entropía Cruzada
     '''
-    def __init__(self, input_size : int, layers : list[tuple]):
+    def __init__(self, input_size : int, output_size : int, layers : list[tuple]):
         """
         Parameters
         ----------
         input_size : int
             Tamaño del vector input `x`
+        output_size : int
+            Tamaño del vector output `y`
         layers: list[tuple]
             Lista de tuplas `(n_neurons, activation_name)` representando cada **capa oculta**
         """
         self.layers = layers
+        self.layers.append((output_size, 'softmax'))
         self.weights = []
         self.biases  = []
 
@@ -99,9 +104,19 @@ class NN:
             self.weights[l] -= lr * self.dW[l]
             self.biases[l] -= lr * self.db[l]
 
-    def fit(self, X_train, y_train, X_val, y_val, epochs, lr):
+    def fit(
+            self, 
+            X_train : np.ndarray, 
+            y_train : np.ndarray, 
+            X_val : np.ndarray, 
+            y_val : np.ndarray,
+            epochs : int = 500, 
+            lr : float = 0.1, 
+            verbose : bool = True
+            ):
         '''
-        ***Training***
+        ***Entrenamiento*** de la red a partir de iteraciones back-propagation para cálculo del gradiente
+        y Gradient-Descent estándar para optimización de los pesos.
 
         Parameters
         ----------
@@ -113,14 +128,22 @@ class NN:
             número máximo de épocas
         eta : float
             Learning rate
+        verbose : bool
+            Muestra en pantalla una barra de progreso con la información del entrenamiento en caso
+            de ser `True`
         '''
         n_classes = self.layers[-1][0]
         Y_train = to_onehot(y_train, n_classes)
         Y_val = to_onehot(y_val, n_classes)
 
         history = {'train_loss': [], 'val_loss': []}
+        t0 = time.time()
 
-        for epoch in range(1, epochs + 1):
+        epochs_list = range(1, epochs + 1)
+        bar = tqdm(epochs_list, desc='Training', unit='epoch', colour='blue')
+        iterator = bar if verbose else epochs_list
+
+        for epoch in iterator:
             y_hat_train = self.forward(X_train)
             self.backward(Y_train)
             self.update(lr)
@@ -131,7 +154,17 @@ class NN:
             history['train_loss'].append(train_loss)
             history['val_loss'].append(val_loss)
 
-            if epoch % 10 == 0:
-                print(f'Epoch {epoch:>4d}/{epochs} | train loss: {train_loss:.4f} | val loss: {val_loss:.4f}')
+            if verbose:
+                bar.set_postfix(epoch=epoch, train_loss=f'{train_loss:.4f}', val_loss=f'{val_loss:.4f}')
+
+        if verbose:
+            bar.colour = 'green'
+            bar.refresh()
+            total_time = time.time() - t0
+            print(f'\nFinal — epoch: {epoch} | train_loss: {history["train_loss"][-1]:.4f} | val_loss: {history["val_loss"][-1]:.4f} | time: {total_time:.1f}s')
 
         return history
+
+class AdvancedNN(NN):
+    def __init__(self, input_size : int, output_size : int, layers : list[tuple]):
+        super().__init__(input_size, output_size, layers)
