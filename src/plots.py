@@ -3,7 +3,7 @@ import numpy as np
 import seaborn as sbn
 
 from src.models import NN
-from src.utils import to_onehot, LABELS, LABELS_PLUS_IDX
+from src.utils import to_onehot, LABELS, LABELS_IDX_X, LABELS_IDX_Y
 from src.metrics import accuracy, cross_entropy, confusion_matrix, f1_macro
 
 def show_images(X : np.ndarray, y : np.ndarray):
@@ -28,7 +28,7 @@ def labels_distribution(y : np.ndarray):
         kde=True,
         bins=49
         )
-    plt.xticks(range(49), LABELS)
+    plt.xticks(range(49), LABELS_IDX_X)
     plt.xlabel('Label')
     plt.ylabel('Frequency')
     plt.title('Label Distribution', fontsize=12)
@@ -91,15 +91,15 @@ def compare_confusion_matrix(model : NN, X_train, y_train, X_val, y_val):
     cm_val = confusion_matrix(yhat_val, y_val, n_classes)
 
     _, axes = plt.subplots(2, 2, figsize=(16, 8), gridspec_kw={'height_ratios': [20, 1]})
-
-    for col, (cm, title) in enumerate(zip([cm_train, cm_val], ['Train', 'Validation'])):
+    for col, (cm, title, cmap) in enumerate(zip([cm_train, cm_val], ['Train', 'Validation'], ['Blues', 'Greens'])):
         ax = axes[0, col]
         cbar_ax = axes[1, col]
         sbn.heatmap(
-            cm, ax=ax, annot=False, cmap='Blues', vmin=0, vmax=cm.max(),
-            xticklabels=LABELS_PLUS_IDX, yticklabels=LABELS_PLUS_IDX,
+            cm, ax=ax, annot=False, cmap=cmap, vmin=0, vmax=cm.max(),
+            xticklabels=LABELS_IDX_X, yticklabels=LABELS_IDX_Y,
             cbar_ax=cbar_ax, cbar_kws={'orientation': 'horizontal'}
                     )
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=0)
         ax.set_title(title)
         ax.set_xlabel('Predicted')
         ax.set_ylabel('True')

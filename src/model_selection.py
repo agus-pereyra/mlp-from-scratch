@@ -1,7 +1,7 @@
-import copy
 from itertools import product
 import numpy as np
 import pandas as pd
+from copy import deepcopy
 from tqdm import tqdm
 from src.models import AdvancedNN
 from src.metrics import f1_macro
@@ -19,13 +19,13 @@ def _fmt_layers(layers) -> str:
 
 
 def grid_search(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_val: np.ndarray,
-    y_val: np.ndarray,
-    param_grid: dict,
-    fit_params: dict = None,
-) -> pd.DataFrame:
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+        param_grid: dict,
+        fit_params: dict = None
+        ) -> pd.DataFrame:
     """
     **Grid-Search** para estructura e hyperparámetros de `AdvancedNN`.
 
@@ -64,7 +64,7 @@ def grid_search(
     n_combos = len(combos)
 
     grid_dims = ' x '.join(f"{k}({len(param_grid[k])})" for k in search_keys)
-    print(f"Grid search — {n_combos} models  [{grid_dims}]\n")
+    print(f"GRID SEARCH — {n_combos} models [{grid_dims}]")
 
     best_f1 = -np.inf
     rows = []
@@ -74,11 +74,11 @@ def grid_search(
     for combo in bar:
         params = dict(zip(search_keys, combo))
         original = params.pop('layers') if 'layers' in params else [(64, 'relu')]
-        layers_config = copy.deepcopy(original)   # stored in DataFrame — never touched by the model
-        layers_raw    = copy.deepcopy(original)   # passed to AdvancedNN — may be mutated
+        layers_config = deepcopy(original)
+        layers_raw = deepcopy(original)
 
         arch_str = _fmt_layers(layers_raw)
-        bar.set_description(f"{arch_str}")
+        bar.set_description(arch_str)
 
         model = AdvancedNN(input_size, n_classes, layers_raw)
         history = model.fit(X_train, y_train, X_val, y_val, **{**default_fit, **params})

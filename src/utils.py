@@ -8,7 +8,8 @@ LABELS = [
     'る', 'ろ', 'わ', 'ゐ', 'ゑ', 'よ', 'ん', '゛', '゜'
 ]
 
-LABELS_PLUS_IDX = [f'{c}={idx}' for idx, c in enumerate(LABELS)]
+LABELS_IDX_Y = [f'{c}→{idx}' for idx, c in enumerate(LABELS)]
+LABELS_IDX_X = [f'{idx}\n↓\n{c}' for idx, c in enumerate(LABELS)]
 
 def to_onehot(y, n_classes):
     Y = np.zeros((y.shape[0], n_classes))
