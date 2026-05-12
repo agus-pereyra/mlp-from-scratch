@@ -13,7 +13,7 @@ def show_images(X : np.ndarray, y : np.ndarray):
         idx = np.random.randint(0, X.shape[0])
         img = X[idx].reshape(28, 28)
         axes[i].imshow(img, cmap='gray')
-        axes[i].set_title(f'Label: {y[idx]} ({LABELS[y[idx]]})')
+        axes[i].set_title(f'{LABELS[y[idx]]} ({y[idx]})')
         axes[i].axis('off')
     plt.suptitle('Samples Visualization', fontsize=16, y=1)
     plt.tight_layout()
@@ -88,22 +88,22 @@ def compare_confusion_matrix(model : NN, X_train, y_train, X_val, y_val):
     yhat_train = model.forward(X_train)
     yhat_val = model.forward(X_val)
     cm_train = confusion_matrix(yhat_train, y_train, n_classes)
-    cm_val = confusion_matrix(yhat_val,   y_val,   n_classes)
+    cm_val = confusion_matrix(yhat_val, y_val, n_classes)
 
-    vmin = 0
-    vmax = max(cm_train.max(), cm_val.max())
+    _, axes = plt.subplots(2, 2, figsize=(16, 8), gridspec_kw={'height_ratios': [20, 1]})
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 8), sharex=True)
-    for ax, cm, title in zip(axes, [cm_train, cm_val], ['Train', 'Validation']):
-        sbn.heatmap(cm, ax=ax, annot=False, cmap='Blues', cbar=False, vmin=vmin, vmax=vmax,
-                    xticklabels=LABELS_PLUS_IDX, yticklabels=LABELS_PLUS_IDX)
+    for col, (cm, title) in enumerate(zip([cm_train, cm_val], ['Train', 'Validation'])):
+        ax = axes[0, col]
+        cbar_ax = axes[1, col]
+        sbn.heatmap(
+            cm, ax=ax, annot=False, cmap='Blues', vmin=0, vmax=cm.max(),
+            xticklabels=LABELS_PLUS_IDX, yticklabels=LABELS_PLUS_IDX,
+            cbar_ax=cbar_ax, cbar_kws={'orientation': 'horizontal'}
+                    )
         ax.set_title(title)
         ax.set_xlabel('Predicted')
         ax.set_ylabel('True')
 
     plt.suptitle('Confusion Matrix Comparison', fontsize=16)
     plt.tight_layout()
-    fig.subplots_adjust(bottom=0.18)
-    cbar_ax = fig.add_axes([0.15, 0.04, 0.7, 0.03])
-    fig.colorbar(axes[0].collections[0], cax=cbar_ax, orientation='horizontal')
     plt.show()

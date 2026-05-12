@@ -2,6 +2,7 @@ import time
 import numpy as np
 from tqdm import tqdm
 from typing import Literal
+from copy import deepcopy
 from src.activations import ACTIVATIONS
 from src.utils import to_onehot
 from src.metrics import cross_entropy
@@ -23,14 +24,14 @@ class NN:
         layers: list[tuple]
             Lista de tuplas `(n_neurons, activation_name)` representando cada **capa oculta**
         """
-        self.layers = layers
+        self.layers = deepcopy(layers)
         self.layers.append((output_size, 'softmax'))
         self.weights = []
         self.biases  = []
 
         # He initialization (sigma^2 = 2/n_in)
         in_size = input_size
-        for (out_size, _) in layers:
+        for (out_size, _) in self.layers:
             self.weights.append(np.random.randn(in_size, out_size) * np.sqrt(2.0 / in_size))
             self.biases.append(np.zeros((1, out_size)))
             in_size = out_size
@@ -308,8 +309,12 @@ class AdvancedNN(NN):
         epochs_no_improve = 0
 
         epochs_list = range(1, epochs + 1)
-        bar = tqdm(epochs_list, desc='Training', unit='epoch', colour='blue')
-        iterator = bar if verbose else epochs_list
+        if verbose:
+            bar = tqdm(epochs_list, desc='Training', unit='epoch', colour='blue')
+            iterator = bar
+        else:
+            bar = None
+            iterator = epochs_list
 
         for epoch in iterator:
             if lr_schedule == 'linear':
