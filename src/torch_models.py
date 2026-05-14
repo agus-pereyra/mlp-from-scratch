@@ -1,4 +1,4 @@
-import time
+﻿import time
 import numpy as np
 import torch
 import torch.nn as nn
@@ -17,7 +17,6 @@ class TorchNN(nn.Module):
     """
     MLP implementada en **PyTorch** con la misma interfaz que `AdvancedNN`.
     """
-
     def __init__(self, input_size: int, output_size: int, layers: list[tuple], dropout: float = 0.0):
         """
         Parameters
@@ -66,11 +65,12 @@ class TorchNN(nn.Module):
         Devuelve probabilidades softmax como np.ndarray (para compatibilidad con métricas).
         No se utiliza en optimización.
         """
-        x = torch.tensor(X, dtype=torch.float32)
+        device = next(self.parameters()).device
+        x = torch.tensor(X, dtype=torch.float32).to(device)
         self.eval()
-        with torch.no_grad():   # no para optimización
+        with torch.no_grad():
             probs = torch.softmax(self._logits(x), dim=1)
-        return probs.numpy()
+        return probs.cpu().numpy()
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         return np.argmax(self.forward(X), axis=1)
@@ -94,17 +94,20 @@ class TorchNN(nn.Module):
         """
         Entrena la red con AdamW + mini-batches + lr scheduling + early stopping.
         """
-        X_t = torch.tensor(X_train, dtype=torch.float32)
-        y_t = torch.tensor(y_train, dtype=torch.long)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.to(device)
+
+        X_t = torch.tensor(X_train, dtype=torch.float32).to(device)
+        y_t = torch.tensor(y_train, dtype=torch.long).to(device)
         val_history = X_val is not None and y_val is not None
         if val_history:
-            X_v = torch.tensor(X_val, dtype=torch.float32)
-            y_v = torch.tensor(y_val, dtype=torch.long)
+            X_v = torch.tensor(X_val, dtype=torch.float32).to(device)
+            y_v = torch.tensor(y_val, dtype=torch.long).to(device)
 
         n = X_t.shape[0]
         bs = n if batch_size is None else batch_size
 
-        criterion = nn.CrossEntropyLoss()
+        criterion = nn.CrossEntropyLoss().to(device)
         optimizer = torch.optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
 
         if lr_schedule == 'exponential':
@@ -189,3 +192,4 @@ class TorchNN(nn.Module):
                 print(f'\nFinal [{status}] — epoch: {epoch} | train_loss: {history["train_loss"][-1]:.4f} | time: {total_time:.1f}s')
 
         return history
+
