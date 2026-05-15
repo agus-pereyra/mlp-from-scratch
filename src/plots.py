@@ -168,30 +168,105 @@ def compare_confusion_matrix(model: NN, X_train, y_train, X_val, y_val, axes=Non
         plt.tight_layout()
         plt.show()
 
-def batch_test_plot(results: dict, ax: plt.Axes = None):
-    standalone = ax is None
-    if standalone:
-        _, ax = plt.subplots(figsize=(10, 5))
+def batch_test_plot(results: dict, axes=None):
+    fig, axes = plt.subplots(1, 2, figsize=(16, 5))
 
     for bs, data in results.items():
         if bs == 1:
-            label = 'M0+batch=1 (SGD)'
+            label = 'Batch=1 (SGD)'
         elif bs is None:
-            label = 'M0 (Full-Batch)'
+            label = 'Full-Batch'
         else:
-            label = f'M0+batch={bs}'
+            label = f'Batch={bs}'
         epochs = len(data['val_loss'])
-        ax.plot(range(1, epochs + 1), data['val_loss'], label=label)
+        x = range(1, epochs + 1)
+        axes[0].plot(x, data['train_loss'], label=label)
+        axes[1].plot(x, data['val_loss'],   label=label)
 
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel('Cross Entropy')
-    ax.set_title('Validation Loss by Batch Size')
-    ax.legend(loc='upper right', framealpha=0.5)
-    ax.grid()
+    for ax, title in zip(axes, ['Train Loss', 'Validation Loss']):
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Cross Entropy')
+        ax.set_title(f'{title} by Batch Size')
+        ax.grid()
 
-    if standalone:
-        plt.tight_layout()
-        plt.show()
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', ncol=len(results),
+               framealpha=0.5, bbox_to_anchor=(0.5, 0))
+
+    plt.tight_layout()
+    plt.show()
+
+def optimizer_test_plot(results: dict, axes=None):
+    fig, axes = plt.subplots(1, 2, figsize=(16, 5))
+
+    linestyles = ['-', '--', ':', '-.']
+    opt_names = list(dict.fromkeys(label.split('(')[0] for label in results))
+    ls_map = {name: linestyles[i % len(linestyles)] for i, name in enumerate(opt_names)}
+
+    for label, data in results.items():
+        opt_name = label.split('(')[0]
+        epochs = len(data['val_loss'])
+        x = range(1, epochs + 1)
+        axes[0].plot(x, data['train_loss'], linestyle=ls_map[opt_name], label=label)
+        axes[1].plot(x, data['val_loss'],   linestyle=ls_map[opt_name], label=label)
+
+    for ax, title in zip(axes, ['Train Loss', 'Validation Loss']):
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Cross Entropy')
+        ax.set_title(f'{title} by Optimizer')
+        ax.grid()
+
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', ncol=min(len(results), 3),
+               framealpha=0.5, bbox_to_anchor=(0.5,0))
+
+    plt.tight_layout()
+    plt.show()
+
+def lr_scheduling_test_plot(linear_results: dict, exponential_results: dict):
+    _, axes = plt.subplots(1, 2, figsize=(16, 5))
+
+    for ax, results, schedule in zip(axes, [linear_results, exponential_results], ['Linear', 'Exponential']):
+        for label, data in results.items():
+            epochs = len(data['val_loss'])
+            x = range(1, epochs + 1)
+            ax.plot(x, data['val_loss'], label=label)
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Cross Entropy')
+        ax.set_title(f'Validation Loss — {schedule} Scheduling')
+        ax.grid()
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles, labels, loc='upper right', framealpha=0.5)
+
+    plt.tight_layout()
+    plt.show()
+
+def weight_decay_test_plot(results: dict, axes=None):
+    fig, axes = plt.subplots(1, 2, figsize=(16, 5))
+
+    linestyles = ['-', '--', ':', '-.']
+    opt_names = list(dict.fromkeys(label.split('(')[0] for label in results))
+    ls_map = {name: linestyles[i % len(linestyles)] for i, name in enumerate(opt_names)}
+
+    for label, data in results.items():
+        opt_name = label.split('(')[0]
+        epochs = len(data['val_loss'])
+        x = range(1, epochs + 1)
+        axes[0].plot(x, data['train_loss'], linestyle=ls_map[opt_name], label=label)
+        axes[1].plot(x, data['val_loss'],   linestyle=ls_map[opt_name], label=label)
+
+    for ax, title in zip(axes, ['Train Loss', 'Validation Loss']):
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Cross Entropy')
+        ax.set_title(f'{title} by Weight Decay')
+        ax.grid()
+
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', ncol=min(len(results), 5),
+               framealpha=0.5, bbox_to_anchor=(0.5, 0))
+
+    plt.tight_layout()
+    plt.show()
 
 def training_summary(model: NN, train_hist: dict, X_train, y_train, X_val, y_val, title: str = None):
     """

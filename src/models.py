@@ -137,7 +137,7 @@ class NN:
         lr_schedule : {'linear', 'exponential'}, optional
             Esquema de scheduling del learning rate. `None` desactiva el scheduling.
         lr_min : float, default `1e-5`
-            Learning rate mínimo para scheduling lineal.
+            Learning rate mínimo para scheduling lineal. Llamada "saturación".
         gamma : float, default `0.99`
             Factor de decaimiento por época para scheduling exponencial.
         patience : int, optional

@@ -33,8 +33,8 @@ def batch_test(
     Returns
     -------
     results : dict
-        Clave = batch_size. Valor = dict con:
-        'train_loss', 'val_loss' (historiales), 'accuracy', 'f1_macro'.
+        Clave = batch_size. 
+        Valor = dict con keys 'train_loss', 'val_loss' (historiales), 'accuracy', 'f1_macro'.
     """
     n_classes = len(np.unique(y_train))
     default_fit = dict(epochs=200, verbose=False)
@@ -42,6 +42,7 @@ def batch_test(
         default_fit.update(fit_params)
 
     m = deepcopy(model)
+    m.optimizer.lr = 0.1
     
     results = {}
     bar = tqdm(batch_sizes, desc='Batch test', unit='batch', colour='blue', ncols=90)
@@ -61,6 +62,218 @@ def batch_test(
     bar.colour = 'green'
     bar.refresh()
     return results
+
+def optimizer_test(
+        model: NN,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+        optimizers: list[Type[Optimizer]],
+        parameters: list[dict],
+        fit_params: dict = None,
+        ) -> dict:
+    """
+    Entrena el modelo con distintos optimizadores y sus combinaciones de hiperparámetros.
+
+    Parameters
+    ----------
+    model : NN
+        Modelo base.
+    optimizers : list[Type[Optimizer]]
+        Lista de clases de optimizador a comparar.
+    parameters : list[dict]
+        Un dict por optimizador. Si un valor es una lista, se prueba una variante por cada elemento.
+    fit_params : dict, optional
+        Parámetros fijos del entrenamiento (epochs, patience, etc.).
+    Returns
+    -------
+    results : dict
+        Clave = etiqueta descriptiva del experimento (e.g. 'Adam(lr=0.01)').
+        Valor = dict con 'train_loss', 'val_loss', 'accuracy', 'f1_macro'.
+    """
+    n_classes = len(np.unique(y_train))
+    default_fit = dict(epochs=200, verbose=False)
+    if fit_params:
+        default_fit.update(fit_params)
+
+    runs = []
+    for optim_class, params in zip(optimizers, parameters):
+        list_keys = [k for k, v in params.items() if isinstance(v, list)]
+        scalar_keys = [k for k, v in params.items() if not isinstance(v, list)]
+
+        if not list_keys:
+            runs.append((optim_class, dict(params)))
+        else:
+            list_values = [params[k] for k in list_keys]
+            for combo in product(*list_values):
+                p = {k: params[k] for k in scalar_keys}
+                p.update(dict(zip(list_keys, combo)))
+                runs.append((optim_class, p))
+
+    m = deepcopy(model)
+    results = {}
+    bar = tqdm(runs, desc='Optimizer test', unit='model', colour='blue', ncols=110)
+    for optim_class, params in bar:
+        label = f"{optim_class.__name__}({', '.join(f'{k}={v}' for k, v in params.items())})"
+        bar.set_description(label)
+
+        m._param_init()
+        m.optimizer = optim_class(**params)
+        m.optimizer.setup(m.weights, m.biases)
+
+        history = m.fit(X_train, y_train, X_val, y_val, **default_fit)
+        yhat_val = m.forward(X_val)
+        results[label] = {
+            'optimizer'  : optim_class.__name__,
+            'params'     : params,
+            'train_loss' : history['train_loss'],
+            'val_loss'   : history['val_loss'],
+            'accuracy'   : accuracy(yhat_val, y_val),
+            'f1_macro'   : f1_macro(yhat_val, y_val, n_classes),
+        }
+        bar.set_postfix(val_loss=f'{history["val_loss"][-1]:.4f}')
+
+    bar.colour = 'green'
+    bar.refresh()
+    return results
+
+def lr_scheduling_test(
+        model: NN,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+        lr_mins: list[float],
+        gammas: list[float],
+        fit_params: dict = None,
+        ) -> tuple[dict, dict]:
+    """
+    Prueba scheduling lineal y exponencial para distintos valores de lr_min y gamma.
+
+    Parameters
+    ----------
+    model : NN
+        Modelo base (se reinicializa por cada variante).
+    lr_mins : list[float]
+        Valores de lr_min a probar (usados en ambos schedulers).
+    gammas : list[float]
+        Valores de gamma a probar (solo exponential; ignorado en linear).
+    fit_params : dict, optional
+        Parámetros fijos del entrenamiento (epochs, patience, etc.).
+
+    Returns
+    -------
+    linear_results, exponential_results : tuple[dict, dict]
+        Cada dict tiene la misma estructura que batch_test/optimizer_test:
+        clave = etiqueta descriptiva, valor = dict con train_loss, val_loss, accuracy, f1_macro.
+    """
+    n_classes = len(np.unique(y_train))
+    default_fit = dict(epochs=300, verbose=False)
+    if fit_params:
+        default_fit.update(fit_params)
+
+    m = deepcopy(model)
+    linear_results = {}
+    exponential_results = {}
+
+    linear_runs = [(lr_min,) for lr_min in lr_mins]
+    exponential_runs = [(gamma,) for gamma in gammas]
+    all_runs = [('linear', f'lr_min={v}', dict(lr_schedule='linear', lr_min=v)) for (v,) in linear_runs] + \
+               [('exp', f'gamma={v}', dict(lr_schedule='exponential', gamma=v)) for (v,) in exponential_runs]
+
+    bar = tqdm(all_runs, desc='LR scheduling test', unit='model', colour='blue', ncols=100)
+    for kind, label, schedule_params in bar:
+        bar.set_description(f'{schedule_params["lr_schedule"]}({label})')
+
+        m._param_init()
+        m.optimizer.setup(m.weights, m.biases)
+
+        history = m.fit(X_train, y_train, X_val, y_val, **{**default_fit, **schedule_params})
+        yhat_val = m.forward(X_val)
+        entry = {
+            'train_loss' : history['train_loss'],
+            'val_loss'   : history['val_loss'],
+            'lr'         : history.get('lr', []),
+            'accuracy'   : accuracy(yhat_val, y_val),
+            'f1_macro'   : f1_macro(yhat_val, y_val, n_classes),
+        }
+        bar.set_postfix(val_loss=f'{history["val_loss"][-1]:.4f}')
+
+        if kind == 'linear':
+            linear_results[label] = entry
+        else:
+            exponential_results[label] = entry
+
+    bar.colour = 'green'
+    bar.refresh()
+    return linear_results, exponential_results
+
+def weight_decay_test(
+        model: NN,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val: np.ndarray,
+        y_val: np.ndarray,
+        optimizer_info: dict[Type[Optimizer], dict],
+        weight_decays: list[float],
+        fit_params: dict = None,
+        ) -> dict:
+    """
+    Entrena el modelo con distintos valores de weight_decay para un optimizador dado.
+
+    Parameters
+    ----------
+    model : NN
+        Modelo base (se reinicializa por cada variante).
+    optimizer_info : dict[Type[Optimizer], dict]
+        {OptimizerClass: {param: value, ...}} con los parámetros base de cada optimizador.
+        Puede contener múltiples optimizadores; se prueban todos los weight_decay para cada uno.
+    weight_decays : list[float]
+        Valores de weight_decay a probar.
+    fit_params : dict, optional
+        Parámetros fijos del entrenamiento (epochs, patience, etc.).
+
+    Returns
+    -------
+    results : dict
+        Clave = 'OptimizerName(wd=value)'. Valor = dict con train_loss, val_loss, accuracy, f1_macro.
+    """
+    n_classes = len(np.unique(y_train))
+    default_fit = dict(epochs=200, verbose=False)
+    if fit_params:
+        default_fit.update(fit_params)
+
+    runs = [(opt_cls, base_params, wd)
+            for opt_cls, base_params in optimizer_info.items()
+            for wd in weight_decays]
+
+    m = deepcopy(model)
+    results = {}
+    bar = tqdm(runs, desc='Weight decay test', unit='model', colour='blue', ncols=110)
+    for opt_cls, base_params, wd in bar:
+        label = f'{opt_cls.__name__}(wd={wd})'
+        bar.set_description(label)
+
+        m._param_init()
+        m.optimizer = opt_cls(**base_params, weight_decay=wd)
+        m.optimizer.setup(m.weights, m.biases)
+
+        history = m.fit(X_train, y_train, X_val, y_val, **default_fit)
+        yhat_val = m.forward(X_val)
+        results[label] = {
+            'weight_decay' : wd,
+            'train_loss'   : history['train_loss'],
+            'val_loss'     : history['val_loss'],
+            'accuracy'     : accuracy(yhat_val, y_val),
+            'f1_macro'     : f1_macro(yhat_val, y_val, n_classes),
+        }
+        bar.set_postfix(val_loss=f'{history["val_loss"][-1]:.4f}')
+
+    bar.colour = 'green'
+    bar.refresh()
+    return results
+
 
 def grid_search(
         X_train: np.ndarray,
