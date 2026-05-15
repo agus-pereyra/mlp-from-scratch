@@ -8,15 +8,35 @@ from src.utils import to_onehot, LABELS, LABELS_IDX_X, LABELS_IDX_Y
 from src.metrics import accuracy, cross_entropy, confusion_matrix, f1_macro
 
 def show_images(X : np.ndarray, y : np.ndarray):
-    _, axes = plt.subplots(3, 5, figsize=(15, 10))
+    np.random.seed(36631)
+    classes = np.unique(y)
+    n_cols = 7
+    n_rows = int(np.ceil(len(classes) / n_cols))
+    _, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 2, n_rows * 2.2))
     axes = axes.flatten()
-    for i in range(axes.size):
-        idx = np.random.randint(0, X.shape[0])
-        img = X[idx].reshape(28, 28)
-        axes[i].imshow(img, cmap='gray')
-        axes[i].set_title(f'{LABELS[y[idx]]} ({y[idx]})')
-        axes[i].axis('off')
-    plt.suptitle('Samples Visualization', fontsize=16, y=1)
+    for ax, c in zip(axes, classes):
+        idx = np.random.choice(np.where(y == c)[0])
+        ax.imshow(X[idx].reshape(28, 28), cmap='gray')
+        ax.set_title(f'{LABELS[c]} ({c})', fontsize=11)
+        ax.axis('off')
+    plt.suptitle('Samples Visualization (one per class)', fontsize=20, y=0.99)
+    plt.tight_layout()
+    plt.show()
+
+def show_class_samples(X : np.ndarray, y : np.ndarray, labels : list[int], n : int):
+    np.random.seed(36631)
+    _, axes = plt.subplots(len(labels), n, figsize=(n * 2, len(labels) * 2.2))
+    for row, c in enumerate(labels):
+        idxs = np.random.choice(np.where(y == c)[0], size=n, replace=False)
+        for col, idx in enumerate(idxs):
+            ax = axes[row, col]
+            ax.imshow(X[idx].reshape(28, 28), cmap='gray')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+        axes[row, 0].set_ylabel(f'{LABELS[c]} ({c})', fontsize=16, rotation=0, labelpad=40, va='center')
+    plt.suptitle('Class Samples', fontsize=20, y=0.98)
     plt.tight_layout()
     plt.show()
 
@@ -145,6 +165,31 @@ def compare_confusion_matrix(model: NN, X_train, y_train, X_val, y_val, axes=Non
 
     if standalone:
         plt.suptitle('Confusion Matrix Comparison', fontsize=16)
+        plt.tight_layout()
+        plt.show()
+
+def batch_test_plot(results: dict, ax: plt.Axes = None):
+    standalone = ax is None
+    if standalone:
+        _, ax = plt.subplots(figsize=(10, 5))
+
+    for bs, data in results.items():
+        if bs == 1:
+            label = 'M0+batch=1 (SGD)'
+        elif bs is None:
+            label = 'M0 (Full-Batch)'
+        else:
+            label = f'M0+batch={bs}'
+        epochs = len(data['val_loss'])
+        ax.plot(range(1, epochs + 1), data['val_loss'], label=label)
+
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Cross Entropy')
+    ax.set_title('Validation Loss by Batch Size')
+    ax.legend(loc='upper right', framealpha=0.5)
+    ax.grid()
+
+    if standalone:
         plt.tight_layout()
         plt.show()
 

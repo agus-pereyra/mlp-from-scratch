@@ -2,6 +2,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from typing import Type
 from tqdm import tqdm
 
 TORCH_ACTIVATIONS = {
@@ -15,9 +16,14 @@ TORCH_ACTIVATIONS = {
 
 class TorchNN(nn.Module):
     """
-    MLP implementada en **PyTorch** con la misma interfaz que `AdvancedNN`.
+    MLP implementada en **PyTorch** con la misma interfaz que `NN`.
     """
-    def __init__(self, input_size: int, output_size: int, layers: list[tuple], dropout: float = 0.0):
+    def __init__(
+            self, input_size: int, output_size: int, layers: list[tuple],
+            dropout: float = 0.0,
+            optimizer: Type[torch.optim.Optimizer] = torch.optim.Adam, 
+            optim_params: dict = None
+            ):
         """
         Parameters
         ----------
@@ -43,6 +49,8 @@ class TorchNN(nn.Module):
             in_size = out_size
         modules.append(nn.Linear(in_size, output_size))
         self.network = nn.Sequential(*modules)
+        self.optimizer  = optimizer
+        self.optim_params = optim_params if optim_params is not None else {}
         self._param_init()
 
     def _param_init(self):
@@ -82,9 +90,7 @@ class TorchNN(nn.Module):
             X_val : np.ndarray = None,
             y_val : np.ndarray = None,
             epochs : int = 200,
-            lr : float = 1e-3,
             batch_size : int = None,
-            weight_decay : float = 0.0,
             lr_schedule : str = None,
             gamma : float = 0.99,
             lr_min : float = 1e-5,
@@ -92,7 +98,8 @@ class TorchNN(nn.Module):
             verbose : bool = True,
         ) -> dict:
         """
-        Entrena la red con AdamW + mini-batches + lr scheduling + early stopping.
+        Entrena la red con mini-batches, lr scheduling y early stopping.
+        El optimizador se configura en `__init__` via `optimizer` y `optim_params`.
         """
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(device)
@@ -108,7 +115,8 @@ class TorchNN(nn.Module):
         bs = n if batch_size is None else batch_size
 
         criterion = nn.CrossEntropyLoss().to(device)
-        optimizer = torch.optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay)
+        optimizer = self.optimizer(self.parameters(), **self.optim_params)
+        lr = optimizer.param_groups[0]['lr']
 
         if lr_schedule == 'exponential':
             scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
@@ -119,11 +127,11 @@ class TorchNN(nn.Module):
         else:
             scheduler = None
 
-        history = {'train_loss': [], 'lr': []}
-        if val_history:
-            history['val_loss'] = []
+        history = {'train_loss': []}
+        if val_history: history['val_loss'] = []
+        if lr_schedule: history['lr'] = []
 
-        best_val_loss  = np.inf
+        best_val_loss = np.inf
         epochs_no_improve = 0
         t0 = time.time()
 
@@ -152,11 +160,9 @@ class TorchNN(nn.Module):
                 if val_history:
                     val_loss = criterion(self._logits(X_v), y_v).item()
 
-            current_lr = optimizer.param_groups[0]['lr']
             history['train_loss'].append(train_loss)
-            history['lr'].append(current_lr)
-            if val_history:
-                history['val_loss'].append(val_loss)
+            if val_history:  history['val_loss'].append(val_loss)
+            if lr_schedule:  history['lr'].append(optimizer.param_groups[0]['lr'])
 
             if scheduler:
                 scheduler.step()
@@ -169,7 +175,7 @@ class TorchNN(nn.Module):
 
             if patience is not None and val_history:
                 if val_loss < best_val_loss:
-                    best_val_loss     = val_loss
+                    best_val_loss = val_loss
                     epochs_no_improve = 0
                 else:
                     epochs_no_improve += 1
