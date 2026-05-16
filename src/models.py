@@ -223,7 +223,7 @@ class NN:
             parts = [f'epoch: {epoch}', f'train_loss: {history["train_loss"][-1]:.4f}']
             if val_history: parts.append(f'val_loss: {history["val_loss"][-1]:.4f}')
             parts.append(f'time: {total_time:.1f}s')
-            print(f'\nTraining [{status}] — {" | ".join(parts)}')
+            print(f'[{status}] — {" | ".join(parts)}')
 
         return history
 

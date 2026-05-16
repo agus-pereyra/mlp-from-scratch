@@ -193,9 +193,9 @@ class TorchNN(nn.Module):
             status = 'early stopping' if stopped_early else 'completed'
             total_time = time.time() - t0
             if val_history:
-                print(f'\nFinal [{status}] — epoch: {epoch} | train_loss: {history["train_loss"][-1]:.4f} | val_loss: {history["val_loss"][-1]:.4f} | time: {total_time:.1f}s')
+                print(f'[{status}] — epoch: {epoch} | train_loss: {history["train_loss"][-1]:.4f} | val_loss: {history["val_loss"][-1]:.4f} | time: {total_time:.1f}s')
             else:
-                print(f'\nFinal [{status}] — epoch: {epoch} | train_loss: {history["train_loss"][-1]:.4f} | time: {total_time:.1f}s')
+                print(f'[{status}] — epoch: {epoch} | train_loss: {history["train_loss"][-1]:.4f} | time: {total_time:.1f}s')
 
         return history
 

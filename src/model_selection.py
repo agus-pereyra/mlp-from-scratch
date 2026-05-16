@@ -37,7 +37,7 @@ def batch_test(
         Valor = dict con keys 'train_loss', 'val_loss' (historiales), 'accuracy', 'f1_macro'.
     """
     n_classes = len(np.unique(y_train))
-    default_fit = dict(epochs=200, verbose=False)
+    default_fit = dict(epochs=400, verbose=False)
     if fit_params:
         default_fit.update(fit_params)
 
@@ -93,7 +93,7 @@ def optimizer_test(
         Valor = dict con 'train_loss', 'val_loss', 'accuracy', 'f1_macro'.
     """
     n_classes = len(np.unique(y_train))
-    default_fit = dict(epochs=200, verbose=False)
+    default_fit = dict(epochs=400, verbose=False)
     if fit_params:
         default_fit.update(fit_params)
 
@@ -125,12 +125,12 @@ def optimizer_test(
         history = m.fit(X_train, y_train, X_val, y_val, **default_fit)
         yhat_val = m.forward(X_val)
         results[label] = {
-            'optimizer'  : optim_class.__name__,
-            'params'     : params,
+            'optimizer' : optim_class.__name__,
+            'params' : params,
             'train_loss' : history['train_loss'],
-            'val_loss'   : history['val_loss'],
-            'accuracy'   : accuracy(yhat_val, y_val),
-            'f1_macro'   : f1_macro(yhat_val, y_val, n_classes),
+            'val_loss' : history['val_loss'],
+            'accuracy' : accuracy(yhat_val, y_val),
+            'f1_macro' : f1_macro(yhat_val, y_val, n_classes),
         }
         bar.set_postfix(val_loss=f'{history["val_loss"][-1]:.4f}')
 
@@ -164,27 +164,29 @@ def lr_scheduling_test(
 
     Returns
     -------
-    linear_results, exponential_results : tuple[dict, dict]
+    constant_results, linear_results, exponential_results : tuple[dict, dict, dict]
         Cada dict tiene la misma estructura que batch_test/optimizer_test:
         clave = etiqueta descriptiva, valor = dict con train_loss, val_loss, accuracy, f1_macro.
     """
     n_classes = len(np.unique(y_train))
-    default_fit = dict(epochs=300, verbose=False)
+    default_fit = dict(epochs=400, verbose=False)
     if fit_params:
         default_fit.update(fit_params)
 
     m = deepcopy(model)
+    constant_results = {}
     linear_results = {}
     exponential_results = {}
 
     linear_runs = [(lr_min,) for lr_min in lr_mins]
     exponential_runs = [(gamma,) for gamma in gammas]
-    all_runs = [('linear', f'lr_min={v}', dict(lr_schedule='linear', lr_min=v)) for (v,) in linear_runs] + \
+    all_runs = [('constant', 'constant lr', {})] + \
+               [('linear', f'lr_min={v}', dict(lr_schedule='linear', lr_min=v)) for (v,) in linear_runs] + \
                [('exp', f'gamma={v}', dict(lr_schedule='exponential', gamma=v)) for (v,) in exponential_runs]
 
     bar = tqdm(all_runs, desc='LR scheduling test', unit='model', colour='blue', ncols=100)
     for kind, label, schedule_params in bar:
-        bar.set_description(f'{schedule_params["lr_schedule"]}({label})')
+        bar.set_description(f'{kind}({label})')
 
         m._param_init()
         m.optimizer.setup(m.weights, m.biases)
@@ -193,21 +195,23 @@ def lr_scheduling_test(
         yhat_val = m.forward(X_val)
         entry = {
             'train_loss' : history['train_loss'],
-            'val_loss'   : history['val_loss'],
-            'lr'         : history.get('lr', []),
-            'accuracy'   : accuracy(yhat_val, y_val),
-            'f1_macro'   : f1_macro(yhat_val, y_val, n_classes),
+            'val_loss' : history['val_loss'],
+            'lr' : history.get('lr', []),
+            'accuracy' : accuracy(yhat_val, y_val),
+            'f1_macro' : f1_macro(yhat_val, y_val, n_classes),
         }
         bar.set_postfix(val_loss=f'{history["val_loss"][-1]:.4f}')
 
-        if kind == 'linear':
+        if kind == 'constant':
+            constant_results[label] = entry
+        elif kind == 'linear':
             linear_results[label] = entry
         else:
             exponential_results[label] = entry
 
     bar.colour = 'green'
     bar.refresh()
-    return linear_results, exponential_results
+    return constant_results, linear_results, exponential_results
 
 def weight_decay_test(
         model: NN,
@@ -240,7 +244,7 @@ def weight_decay_test(
         Clave = 'OptimizerName(wd=value)'. Valor = dict con train_loss, val_loss, accuracy, f1_macro.
     """
     n_classes = len(np.unique(y_train))
-    default_fit = dict(epochs=200, verbose=False)
+    default_fit = dict(epochs=400, verbose=False)
     if fit_params:
         default_fit.update(fit_params)
 
@@ -263,10 +267,10 @@ def weight_decay_test(
         yhat_val = m.forward(X_val)
         results[label] = {
             'weight_decay' : wd,
-            'train_loss'   : history['train_loss'],
-            'val_loss'     : history['val_loss'],
-            'accuracy'     : accuracy(yhat_val, y_val),
-            'f1_macro'     : f1_macro(yhat_val, y_val, n_classes),
+            'train_loss' : history['train_loss'],
+            'val_loss' : history['val_loss'],
+            'accuracy' : accuracy(yhat_val, y_val),
+            'f1_macro' : f1_macro(yhat_val, y_val, n_classes),
         }
         bar.set_postfix(val_loss=f'{history["val_loss"][-1]:.4f}')
 

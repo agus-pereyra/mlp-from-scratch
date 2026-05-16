@@ -223,10 +223,15 @@ def optimizer_test_plot(results: dict, axes=None):
     plt.tight_layout()
     plt.show()
 
-def lr_scheduling_test_plot(linear_results: dict, exponential_results: dict):
+def lr_scheduling_test_plot(constant_results: dict, linear_results: dict, exponential_results: dict):
     _, axes = plt.subplots(1, 2, figsize=(16, 5))
 
+    constant_label, constant_data = next(iter(constant_results.items()))
+    constant_epochs = len(constant_data['val_loss'])
+
     for ax, results, schedule in zip(axes, [linear_results, exponential_results], ['Linear', 'Exponential']):
+        x_const = range(1, constant_epochs + 1)
+        ax.plot(x_const, constant_data['val_loss'], label=constant_label, color='black', linestyle='--', linewidth=1.5)
         for label, data in results.items():
             epochs = len(data['val_loss'])
             x = range(1, epochs + 1)
@@ -268,11 +273,8 @@ def weight_decay_test_plot(results: dict, axes=None):
     plt.tight_layout()
     plt.show()
 
-def training_summary(model: NN, train_hist: dict, X_train, y_train, X_val, y_val, title: str = None):
-    """
-    Summary figure with all training plots in one view.
-    lr_history is included only if 'lr' is present in train_hist.
-    """
+def training_summary(model: NN, train_hist: dict, X_train, y_train,
+                    X_val, y_val, title: str = None):
     has_lr = 'lr' in train_hist and len(train_hist['lr']) > 0
 
     n_top_cols = 3 if has_lr else 2
@@ -303,4 +305,120 @@ def training_summary(model: NN, train_hist: dict, X_train, y_train, X_val, y_val
     compare_confusion_matrix(model, X_train, y_train, X_val, y_val, axes=cm_axes)
 
     fig.suptitle(title or 'Training Summary', fontsize=20, y=0.93)
+    plt.show()
+
+def _has_early_stop(train_hists):
+    counts = [len(h['train_loss']) for h in train_hists]
+    return min(counts) < max(counts)
+
+def compare_loss_curves(train_hists: list[dict], names: list[str], ax_main=None, ax_zoom=None):
+    epoch_counts = [len(h['train_loss']) for h in train_hists]
+    max_epochs   = max(epoch_counts)
+    early_stopped = [n for n in epoch_counts if n < max_epochs]
+    has_zoom = bool(early_stopped)
+
+    standalone = ax_main is None
+    if standalone:
+        n_cols = 2 if has_zoom else 1
+        ratios = [2, 1] if has_zoom else [1]
+        _, axes = plt.subplots(1, n_cols, figsize=(10 * n_cols // 1, 5),
+                               gridspec_kw={'width_ratios': ratios})
+        ax_main = axes[0] if has_zoom else axes
+        ax_zoom = axes[1] if has_zoom else None
+
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for i, (hist, name) in enumerate(zip(train_hists, names)):
+        c = colors[i % len(colors)]
+        n = len(hist['train_loss'])
+        x = range(1, n + 1)
+        ax_main.plot(x, hist['train_loss'], color=c, linestyle='--', alpha=0.5)
+        ax_main.plot(x, hist['val_loss'],   color=c, linestyle='-')
+        ax_main.plot([], [], color=c, linestyle='--', alpha=0.6, label=f'{name} (dev)')
+        ax_main.plot([], [], color=c, linestyle='-',             label=f'{name} (test)')
+        if ax_zoom is not None:
+            ax_zoom.plot(x, hist['train_loss'], color=c, linestyle='--', alpha=0.5)
+            ax_zoom.plot(x, hist['val_loss'],   color=c, linestyle='-')
+
+    ax_main.set_xlabel('Epoch')
+    ax_main.set_ylabel('Cross Entropy')
+    ax_main.set_title('Loss Curves — Final Models')
+    ax_main.legend(ncols=2)
+    ax_main.grid()
+
+    if ax_zoom is not None and early_stopped:
+        zoom_end = max(early_stopped)
+        ax_zoom.set_xlim(1, zoom_end)
+        all_vals = [v for h in train_hists
+                    for v in list(h['train_loss'][:zoom_end]) + list(h['val_loss'][:zoom_end])]
+        margin = (max(all_vals) - min(all_vals)) * 0.1 or 0.01
+        ax_zoom.set_ylim(min(all_vals) - margin, max(all_vals) + margin)
+        for n in early_stopped:
+            ax_zoom.axvline(n, color='gray', linestyle=':', linewidth=1)
+        ax_zoom.set_xlabel('Epoch')
+        ax_zoom.set_title('Early Stop — Zoom')
+        ax_zoom.grid()
+
+    if standalone:
+        plt.tight_layout()
+        plt.show()
+
+def compare_final_metrics(models: list, X, y, names: list[str], n_classes: int, ax: plt.Axes = None):
+    standalone = ax is None
+    if standalone:
+        _, ax = plt.subplots(figsize=(10, 5))
+
+    from src.metrics import accuracy, cross_entropy, f1_macro
+    from src.utils import to_onehot
+    y_oh = to_onehot(y, n_classes)
+
+    metric_names = ['Accuracy', 'F1 Macro', 'Cross Entropy']
+    scores = []
+    for model in models:
+        yhat = model.forward(X)
+        scores.append([
+            accuracy(yhat, y),
+            f1_macro(yhat, y, n_classes),
+            cross_entropy(yhat, y_oh),
+        ])
+
+    x = np.arange(len(metric_names))
+    width = 0.8 / len(models)
+    offsets = np.linspace(-(len(models)-1)/2, (len(models)-1)/2, len(models)) * width
+
+    for (name, s, offset) in zip(names, scores, offsets):
+        bars = ax.bar(x + offset, s, width, label=name)
+        ax.bar_label(bars, fmt='%.4f', padding=3, fontsize=7)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(metric_names)
+    ax.set_ylim(0, max(s[i] for s in scores for i in range(len(metric_names))) * 1.15)
+    ax.set_ylabel('Score')
+    ax.set_title('Metrics')
+    ax.legend()
+    ax.grid(axis='y', linestyle='--')
+
+    if standalone:
+        plt.tight_layout()
+        plt.show()
+
+def compare_final_models(models: list, train_hists: list[dict], names: list[str],
+                         X, y, n_classes: int = 49, title: str = None):
+    has_zoom = _has_early_stop(train_hists)
+    n_loss_cols = 2 if has_zoom else 1
+    loss_ratios = [2, 1] if has_zoom else [1]
+
+    fig = plt.figure(figsize=(14, 8))
+    gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[1, 1], hspace=0.35)
+
+    top_gs = gridspec.GridSpecFromSubplotSpec(1, n_loss_cols, subplot_spec=gs[0],
+                                             width_ratios=loss_ratios, wspace=0.25)
+    ax_main = fig.add_subplot(top_gs[0])
+    ax_zoom = fig.add_subplot(top_gs[1]) if has_zoom else None
+
+    ax_metrics = fig.add_subplot(gs[1])
+
+    compare_loss_curves(train_hists, names, ax_main=ax_main, ax_zoom=ax_zoom)
+    compare_final_metrics(models, X, y, names, n_classes, ax=ax_metrics)
+
+    fig.suptitle(title or 'Final Models Comparison', fontsize=16)
     plt.show()
