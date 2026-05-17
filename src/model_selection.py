@@ -394,8 +394,23 @@ def perturb(X: np.ndarray, sigma: float) -> np.ndarray:
     noise = np.random.normal(0, sigma, X.shape)
     return np.clip(X + noise, 0, 1)
 
+def initialization_variance(model : NN | TorchNN, fit_params: dict,
+                            X_train, y_train, X_val, y_val,
+                            n_runs: int = 10, n_classes: int = 49) -> dict:
+    records = {'accuracy': [], 'cross_entropy': [], 'f1_macro': []}
+    y_val_oh = to_onehot(y_val, n_classes)
+    for i in range(1, n_runs + 1):
+        m = deepcopy(model)
+        m._param_init()
+        m.fit(X_train, y_train, X_val, y_val, **{**fit_params, 'verbose': False})
+        yhat = m.forward(X_val)
+        records['accuracy'].append(accuracy(yhat, y_val))
+        records['cross_entropy'].append(cross_entropy(yhat, y_val_oh))
+        records['f1_macro'].append(f1_macro(yhat, y_val, n_classes))
+    return records
+
 def robustness_test(
-        models: list,
+        models: list[NN | TorchNN],
         names: list[str],
         X: np.ndarray,
         y: np.ndarray,

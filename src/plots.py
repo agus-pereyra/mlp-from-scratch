@@ -465,3 +465,31 @@ def show_noise_levels(X: np.ndarray, noise_levels: list[float]):
     plt.suptitle(f'Sample under Gaussian noise', fontsize=17)
     plt.tight_layout()
     plt.show()
+
+def initialization_variance_plot(records: dict):
+    titles = ['Accuracy', 'Cross Entropy (val)', 'F1 Macro']
+    keys = ['accuracy', 'cross_entropy', 'f1_macro']
+    colors = ['tab:blue', 'tab:orange', 'tab:green']
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+    n_runs = len(records[keys[0]])
+    runs = range(1, n_runs + 1)
+
+    for ax, key, title, color in zip(axes, keys, titles, colors):
+        vals = records[key]
+        mean = np.mean(vals)
+        std  = np.std(vals)
+
+        ax.plot(runs, vals, marker='o', color=color, linewidth=1.2, label='run value')
+        ax.axhline(mean, color=color, linestyle='--', linewidth=1.5, label=f'mean={mean:.4f}')
+        ax.fill_between(runs, mean - std, mean + std, color=color, alpha=0.12, label=f'±std={std:.4f}')
+
+        ax.set_title(title, fontsize=11)
+        ax.set_xlabel('Run')
+        # ax.set_xticks(list(runs))
+        ax.grid(axis='y', linestyle='--', alpha=0.6)
+        ax.legend(fontsize=12, loc='upper right', framealpha=0.5)
+
+    fig.suptitle('Metric variance across model parameter re-initialization', fontsize=16)
+    plt.tight_layout()
+    plt.show()
