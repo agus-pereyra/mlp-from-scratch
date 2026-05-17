@@ -314,7 +314,7 @@ def _has_early_stop(train_hists):
 
 def compare_loss_curves(train_hists: list[dict], names: list[str], ax_main=None, ax_zoom=None):
     epoch_counts = [len(h['train_loss']) for h in train_hists]
-    max_epochs   = max(epoch_counts)
+    max_epochs = max(epoch_counts)
     early_stopped = [n for n in epoch_counts if n < max_epochs]
     has_zoom = bool(early_stopped)
 
@@ -335,28 +335,27 @@ def compare_loss_curves(train_hists: list[dict], names: list[str], ax_main=None,
         ax_main.plot(x, hist['train_loss'], color=c, linestyle='--', alpha=0.5)
         ax_main.plot(x, hist['val_loss'],   color=c, linestyle='-')
         ax_main.plot([], [], color=c, linestyle='--', alpha=0.6, label=f'{name} (dev)')
-        ax_main.plot([], [], color=c, linestyle='-',             label=f'{name} (test)')
+        ax_main.plot([], [], color=c, linestyle='-', label=f'{name} (test)')
         if ax_zoom is not None:
             ax_zoom.plot(x, hist['train_loss'], color=c, linestyle='--', alpha=0.5)
             ax_zoom.plot(x, hist['val_loss'],   color=c, linestyle='-')
 
     ax_main.set_xlabel('Epoch')
     ax_main.set_ylabel('Cross Entropy')
-    ax_main.set_title('Loss Curves — Final Models')
+    ax_main.set_title('Loss Curves')
     ax_main.legend(ncols=2)
     ax_main.grid()
 
     if ax_zoom is not None and early_stopped:
         zoom_end = max(early_stopped)
         ax_zoom.set_xlim(1, zoom_end)
-        all_vals = [v for h in train_hists
-                    for v in list(h['train_loss'][:zoom_end]) + list(h['val_loss'][:zoom_end])]
+        all_vals = [v for h in train_hists for v in list(h['train_loss'][:zoom_end]) + list(h['val_loss'][:zoom_end])]
         margin = (max(all_vals) - min(all_vals)) * 0.1 or 0.01
         ax_zoom.set_ylim(min(all_vals) - margin, max(all_vals) + margin)
         for n in early_stopped:
             ax_zoom.axvline(n, color='gray', linestyle=':', linewidth=1)
         ax_zoom.set_xlabel('Epoch')
-        ax_zoom.set_title('Early Stop — Zoom')
+        ax_zoom.set_title('Loss Curves (Early Stop Zoom)')
         ax_zoom.grid()
 
     if standalone:
@@ -486,7 +485,6 @@ def initialization_variance_plot(records: dict):
 
         ax.set_title(title, fontsize=11)
         ax.set_xlabel('Run')
-        # ax.set_xticks(list(runs))
         ax.grid(axis='y', linestyle='--', alpha=0.6)
         ax.legend(fontsize=12, loc='upper right', framealpha=0.5)
 
