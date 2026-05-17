@@ -7,7 +7,8 @@ from tqdm import tqdm
 from src.models import NN
 from src.torch_models import TorchNN
 from src.optimizers import Optimizer, GD
-from src.metrics import f1_macro, accuracy
+from src.metrics import f1_macro, accuracy, cross_entropy
+from src.utils import to_onehot
 
 def batch_test(
         model: NN,
@@ -388,6 +389,34 @@ def grid_search(
     df = pd.DataFrame(rows).sort_values('val_loss', ascending=True).reset_index(drop=True)
     df.index += 1
     return df
+
+def perturb(X: np.ndarray, sigma: float) -> np.ndarray:
+    noise = np.random.normal(0, sigma, X.shape)
+    return np.clip(X + noise, 0, 1)
+
+def robustness_test(
+        models: list,
+        names: list[str],
+        X: np.ndarray,
+        y: np.ndarray,
+        noise_levels: list[float],
+        n_classes: int,
+        ) -> pd.DataFrame:
+    y_oh = to_onehot(y, n_classes)
+    rows = []
+    for sigma in noise_levels:
+        X_noisy = perturb(X, sigma) if sigma > 0 else X
+        for model, name in zip(models, names):
+            yhat = model.forward(X_noisy)
+            rows.append({
+                'model'      : name,
+                'sigma'      : sigma,
+                'accuracy'   : accuracy(yhat, y),
+                'f1_macro'   : f1_macro(yhat, y, n_classes),
+                'cross_entropy': cross_entropy(yhat, y_oh),
+            })
+    return pd.DataFrame(rows)
+
 
 def _fmt_layers(layers) -> str:
     """

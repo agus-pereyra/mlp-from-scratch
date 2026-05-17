@@ -410,8 +410,7 @@ def compare_final_models(models: list, train_hists: list[dict], names: list[str]
     fig = plt.figure(figsize=(14, 8))
     gs = gridspec.GridSpec(2, 1, figure=fig, height_ratios=[1, 1], hspace=0.35)
 
-    top_gs = gridspec.GridSpecFromSubplotSpec(1, n_loss_cols, subplot_spec=gs[0],
-                                             width_ratios=loss_ratios, wspace=0.25)
+    top_gs = gridspec.GridSpecFromSubplotSpec(1, n_loss_cols, subplot_spec=gs[0], width_ratios=loss_ratios, wspace=0.25)
     ax_main = fig.add_subplot(top_gs[0])
     ax_zoom = fig.add_subplot(top_gs[1]) if has_zoom else None
 
@@ -421,4 +420,32 @@ def compare_final_models(models: list, train_hists: list[dict], names: list[str]
     compare_final_metrics(models, X, y, names, n_classes, ax=ax_metrics)
 
     fig.suptitle(title or 'Final Models Comparison', fontsize=16)
+    plt.show()
+
+def robustness_plot(df, title: str = None):
+    import pandas as pd
+    metrics = ['accuracy', 'f1_macro', 'cross_entropy']
+    titles  = ['Accuracy', 'F1 Macro', 'Cross Entropy']
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    names  = df['model'].unique()
+
+    for ax, metric, mtitle in zip(axes, metrics, titles):
+        baseline = df[df['sigma'] == df['sigma'].min()]
+        for i, name in enumerate(names):
+            sub = df[df['model'] == name].sort_values('sigma')
+            base_val = baseline[baseline['model'] == name][metric].values[0]
+            ax.plot(sub['sigma'], sub[metric], marker='o', color=colors[i % len(colors)], label=name)
+            ax.axhline(base_val, color=colors[i % len(colors)], linestyle='--', alpha=0.3, linewidth=1)
+        ax.set_xlabel('Noise $\\sigma$')
+        ax.set_ylabel(mtitle)
+        ax.set_title(mtitle)
+        ax.grid()
+
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', ncol=len(names),
+               bbox_to_anchor=(0.5, 0), framealpha=0.5)
+    fig.suptitle(title or 'Robustness to Gaussian Noise', fontsize=16)
+    plt.tight_layout()
     plt.show()
