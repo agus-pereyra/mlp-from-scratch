@@ -39,7 +39,7 @@ Finalmente se analizan los modelos ante perturbaciones (gaussianas) de los datos
 │   ├── torch_models.py     # MLP equivalente implementada en PyTorch (clase TorchNN)
 │   └── utils.py            # utilidades varias (one-hot encoding, labels K49, paths, etc)
 │
-├── Entrega_TP3.ipynb       # notebook principal
+├── main.ipynb              # notebook principal
 ├── README.md
 └── requirements.txt        # dependencias
 ```
