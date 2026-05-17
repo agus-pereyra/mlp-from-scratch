@@ -46,7 +46,7 @@ Finalmente se analizan los modelos ante perturbaciones (gaussianas) de los datos
 
 #### Dependencias
 
-Para instalar todas las dependencias del trabajo se requiere ejecutar el siguiente comando para un envirounment de conda:
+Para instalar todas las dependencias del trabajo se requiere ejecutar el siguiente comando para un environment de conda:
 
 ```bash
 conda install --file requirements.txt
