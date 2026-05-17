@@ -279,7 +279,6 @@ def weight_decay_test(
     bar.refresh()
     return results
 
-
 def grid_search(
         X_train: np.ndarray,
         y_train: np.ndarray,
@@ -391,12 +390,53 @@ def grid_search(
     return df
 
 def perturb(X: np.ndarray, sigma: float) -> np.ndarray:
+    """
+    Agrega ruido gaussiano a los datos y recorta los valores al rango [0, 1].
+
+    Parameters
+    ----------
+    X : np.ndarray
+        Datos de entrada normalizados en [0, 1].
+    sigma : float
+        Desviación estándar del ruido gaussiano a aplicar.
+
+    Returns
+    -------
+    X_noisy : np.ndarray
+        Datos perturbados, del mismo shape que `X`, con valores en [0, 1].
+    """
     noise = np.random.normal(0, sigma, X.shape)
     return np.clip(X + noise, 0, 1)
 
 def initialization_variance(model : NN | TorchNN, fit_params: dict,
                             X_train, y_train, X_val, y_val,
                             n_runs: int = 10, n_classes: int = 49) -> dict:
+    """
+    Re-entrena el modelo `n_runs` veces con distintas inicializaciones aleatorias
+    de parámetros, manteniendo los mismos hiperparámetros, y registra las métricas
+    finales sobre validación en cada corrida.
+
+    Parameters
+    ----------
+    model : NN | TorchNN
+        Modelo base cuya arquitectura e hiperparámetros se reutilizan.
+    fit_params : dict
+        Parámetros de entrenamiento a mantener constantes (epochs, batch_size, etc.).
+    X_train, y_train : np.ndarray
+        Datos de entrenamiento.
+    X_val, y_val : np.ndarray
+        Datos de validación sobre los que se evalúa cada corrida.
+    n_runs : int, default `10`
+        Número de re-inicializaciones y re-entrenamientos a realizar.
+    n_classes : int, default `49`
+        Número de clases del problema.
+
+    Returns
+    -------
+    records : dict
+        Diccionario con listas de métricas por corrida.
+        Keys: 'accuracy', 'cross_entropy', 'f1_macro'.
+    """
     records = {'accuracy': [], 'cross_entropy': [], 'f1_macro': []}
     y_val_oh = to_onehot(y_val, n_classes)
     for i in range(1, n_runs + 1):
@@ -417,6 +457,33 @@ def robustness_test(
         noise_levels: list[float],
         n_classes: int,
         ) -> pd.DataFrame:
+    """
+    Evalúa la robustez de una lista de modelos ante distintos niveles de ruido gaussiano.
+
+    Para cada nivel de ruido `sigma`, perturba los datos con `perturb` y calcula
+    accuracy, F1-macro y cross-entropy de cada modelo sobre los datos perturbados.
+
+    Parameters
+    ----------
+    models : list[NN | TorchNN]
+        Lista de modelos entrenados a evaluar.
+    names : list[str]
+        Etiquetas identificadoras de cada modelo (mismo orden que `models`).
+    X : np.ndarray
+        Datos de entrada normalizados en [0, 1] sobre los que se aplica el ruido.
+    y : np.ndarray
+        Labels verdaderos correspondientes a `X`.
+    noise_levels : list[float]
+        Valores de sigma a probar. `0` evalúa los datos sin perturbación.
+    n_classes : int
+        Número de clases del problema.
+
+    Returns
+    -------
+    results : pd.DataFrame
+        DataFrame con columnas 'model', 'sigma', 'accuracy', 'f1_macro', 'cross_entropy'.
+        Una fila por cada combinación (modelo, sigma).
+    """
     y_oh = to_onehot(y, n_classes)
     rows = []
     for sigma in noise_levels:
@@ -436,8 +503,7 @@ def _fmt_layers(layers) -> str:
     """
     Formatear cómo se muestra la estructura de capas ocultas en la progress bar de grid_search
 
-    [(64,'relu'),(32,'relu')] → '[64→32]'
-
+    Ejemplo: [(64,'relu'),(32,'relu')] → '[64→32]'
     """
     sizes = [str(n) for n, _ in layers]
     return f"[{'→'.join(sizes)}]"
