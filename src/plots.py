@@ -6,6 +6,7 @@ import seaborn as sbn
 from src.models import NN
 from src.utils import to_onehot, LABELS, LABELS_IDX_X, LABELS_IDX_Y
 from src.metrics import accuracy, cross_entropy, confusion_matrix, f1_macro
+from src.model_selection import perturb
 
 def show_images(X : np.ndarray, y : np.ndarray):
     np.random.seed(36631)
@@ -432,12 +433,9 @@ def robustness_plot(df, title: str = None):
     names  = df['model'].unique()
 
     for ax, metric, mtitle in zip(axes, metrics, titles):
-        baseline = df[df['sigma'] == df['sigma'].min()]
         for i, name in enumerate(names):
             sub = df[df['model'] == name].sort_values('sigma')
-            base_val = baseline[baseline['model'] == name][metric].values[0]
             ax.plot(sub['sigma'], sub[metric], marker='o', color=colors[i % len(colors)], label=name)
-            ax.axhline(base_val, color=colors[i % len(colors)], linestyle='--', alpha=0.3, linewidth=1)
         ax.set_xlabel('Noise $\\sigma$')
         ax.set_ylabel(mtitle)
         ax.set_title(mtitle)
@@ -446,6 +444,24 @@ def robustness_plot(df, title: str = None):
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper center', ncol=len(names),
                bbox_to_anchor=(0.5, 0), framealpha=0.5)
-    fig.suptitle(title or 'Robustness to Gaussian Noise', fontsize=16)
+    fig.suptitle(title or 'Robustness to Gaussian Noise', fontsize=18)
+    plt.tight_layout()
+    plt.show()
+
+def show_noise_levels(X: np.ndarray, noise_levels: list[float]):
+    idx = np.random.randint(len(X))
+    img = X[idx]
+    n = len(noise_levels)
+    even = n % 2 == 0
+    _, axes = plt.subplots(2, int(np.ceil(n/2)), figsize=(n * 1.5, 7))
+    axes = axes.flatten()
+    for ax, sigma in zip(axes, noise_levels):
+        noisy = perturb(img[np.newaxis], sigma)[0] if sigma > 0 else img
+        ax.imshow(noisy.reshape(28, 28), cmap='gray', vmin=0, vmax=1) # dataset normalizado a 0 1
+        ax.set_title(f'$\\sigma={sigma:.2f}$', fontsize=10)
+        ax.axis('off')
+    if not even:
+        axes[-1].set_visible(False)
+    plt.suptitle(f'Sample under Gaussian noise', fontsize=17)
     plt.tight_layout()
     plt.show()

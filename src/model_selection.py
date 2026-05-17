@@ -409,14 +409,13 @@ def robustness_test(
         for model, name in zip(models, names):
             yhat = model.forward(X_noisy)
             rows.append({
-                'model'      : name,
-                'sigma'      : sigma,
-                'accuracy'   : accuracy(yhat, y),
-                'f1_macro'   : f1_macro(yhat, y, n_classes),
+                'model' : name,
+                'sigma' : sigma,
+                'accuracy' : accuracy(yhat, y),
+                'f1_macro' : f1_macro(yhat, y, n_classes),
                 'cross_entropy': cross_entropy(yhat, y_oh),
             })
     return pd.DataFrame(rows)
-
 
 def _fmt_layers(layers) -> str:
     """
