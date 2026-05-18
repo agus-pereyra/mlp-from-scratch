@@ -26,7 +26,7 @@ Finalmente se analizan los modelos ante perturbaciones (gaussianas) de los datos
 ├── data/
 │   ├── X_images.npy        # imágenes del dataset
 │   └── y_images.npy        # labels del dataset
-├── figures/                # figuras del DOCSTRING
+├── figures/                # figuras del README
 ├── results/                # CSVs de grid search guardados por experimento
 ├── src/
 │   ├── __init__.py
